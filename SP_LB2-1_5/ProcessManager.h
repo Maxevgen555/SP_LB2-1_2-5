@@ -52,6 +52,16 @@
 #define IDC_FILE_PATH 5001
 #define IDC_BROWSE_BUTTON 5002
 
+#define IDD_TESTPROC_PARAMS 5001
+#define IDC_EDIT_X 5002
+#define IDC_EDIT_Y 5003
+#define IDC_EDIT_WIDTH 5004
+#define IDC_EDIT_HEIGHT 5005
+#define IDC_COMBO_STYLE 5006
+
+// Прототип функции диалога
+INT_PTR CALLBACK TestProcParamsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam);
+
 // ================= ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ =================
 // Эти переменные доступны во всех модулях программы
 

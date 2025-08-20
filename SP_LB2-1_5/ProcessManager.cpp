@@ -25,6 +25,71 @@ DWORD ThreadId[5] = { 0 };              // Идентификаторы потоков (TID)
 LPTSTR ProcImage[5] = { NULL };         // Пути к исполняемым файлам
 TCHAR CmdParam[5][260] = { {0} };       // Параметры командной строки
 
+static int g_testProcX = 100;
+static int g_testProcY = 100;
+static int g_testProcWidth = 400;
+static int g_testProcHeight = 300;
+static int g_testProcShowCmd = SW_SHOWNORMAL;
+TCHAR g_selectedFilePath[MAX_PATH] = { 0 };
+
+//=== Функция запуска TestProc с параметрами окна ======================//
+// Параметры:
+//   x, y - позиция окна на экране в пикселях
+//   width, height - размеры окна в пикселях  
+//   nCmdShow - режим отображения (SW_SHOWNORMAL, SW_SHOWMAXIMIZED, etc.)
+// Возвращает: TRUE если успешно, FALSE при ошибке
+BOOL StartTestProc(int x, int y, int width, int height, int nCmdShow)
+{
+    PROCESS_INFORMATION pi; // Структура для информации о процессе
+    STARTUPINFO si;         // Структура для параметров запуска
+
+    // Инициализируем структуры нулями
+    ZeroMemory(&si, sizeof(si));
+    si.cb = sizeof(si);     // Обязательно устанавливаем размер структуры
+    ZeroMemory(&pi, sizeof(pi));
+
+    // Настраиваем параметры окна через STARTUPINFO
+    si.dwFlags = STARTF_USEPOSITION | STARTF_USESIZE | STARTF_USESHOWWINDOW;
+    si.dwX = x;             // Позиция X окна
+    si.dwY = y;             // Позиция Y окна  
+    si.dwXSize = width;     // Ширина окна
+    si.dwYSize = height;    // Высота окна
+    si.wShowWindow = nCmdShow; // Режим отображения окна
+
+    // Формируем командную строку с параметрами для TestProc
+    TCHAR commandLine[256];
+    _stprintf_s(commandLine, _countof(commandLine),
+        _T("TestProc.exe %d %d %d %d"), x, y, width, height);
+
+    // Создаем процесс TestProc
+    if (!CreateProcess(
+        NULL,               // Имя модуля (используется commandLine)
+        commandLine,        // Командная строка с параметрами
+        NULL,               // Атрибуты безопасности процесса (по умолчанию)
+        NULL,               // Атрибуты безопасности потока (по умолчанию)
+        FALSE,              // Наследование дескрипторов (не наследуем)
+        0,                  // Флаги создания (по умолчанию)
+        NULL,               // Окружение процесса (текущее)
+        NULL,               // Текущий каталог (текущий)
+        &si,                // STARTUPINFO с параметрами окна
+        &pi))               // PROCESS_INFORMATION для информации о процессе
+    {
+        // Обработка ошибки создания процесса
+        DWORD error = GetLastError();
+        TCHAR errorMsg[256];
+        _stprintf_s(errorMsg, _countof(errorMsg),
+            _T("Не удалось запустить TestProc. Код ошибки: %lu"), error);
+        MessageBox(NULL, errorMsg, _T("Ошибка"), MB_OK | MB_ICONERROR);
+        return FALSE;
+    }
+
+    // Закрываем дескрипторы процесса и потока, так как они нам не нужны
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    return TRUE; // Успешное завершение
+}
+
 // ================= ТОЧКА ВХОДА ПРИЛОЖЕНИЯ =================
 
 // Главная функция Windows приложения
@@ -182,13 +247,13 @@ BOOL InitInstance(HINSTANCE hInstance, int nCmdShow) {
 // ================= 5.1 ДИАЛОГ ВЫБОРА ФАЙЛА =================
 
 // Диалоговая процедура для выбора текстового файла
+// Диалоговая процедура для выбора текстового файла
 INT_PTR CALLBACK SelectFileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam) {
-    static TCHAR filePath[MAX_PATH] = { 0 };  // Статический буфер для пути к файлу
-
     switch (message) {
     case WM_INITDIALOG:
         // Инициализация диалога - очистка поля ввода
         SetDlgItemText(hDlg, IDC_FILE_PATH, _T(""));
+        g_selectedFilePath[0] = _T('\0'); // Очищаем предыдущий выбор
         return TRUE;
 
     case WM_COMMAND:
@@ -216,14 +281,20 @@ INT_PTR CALLBACK SelectFileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
             if (GetOpenFileName(&ofn)) {
                 // Установка выбранного пути в поле ввода
                 SetDlgItemText(hDlg, IDC_FILE_PATH, szFile);
+                // Сохраняем путь в глобальную переменную
+                _tcscpy_s(g_selectedFilePath, _countof(g_selectedFilePath), szFile);
             }
             break;
         }
         case IDOK:  // Нажатие кнопки OK
         {
-            // Получение пути из поля ввода
-            GetDlgItemText(hDlg, IDC_FILE_PATH, filePath, MAX_PATH);
-            if (_tcslen(filePath) > 0) {
+            // Получаем путь из поля ввода (на случай, если пользователь ввел путь вручную)
+            TCHAR tempPath[MAX_PATH];
+            GetDlgItemText(hDlg, IDC_FILE_PATH, tempPath, MAX_PATH);
+
+            if (_tcslen(tempPath) > 0) {
+                // Сохраняем путь в глобальную переменную
+                _tcscpy_s(g_selectedFilePath, _countof(g_selectedFilePath), tempPath);
                 EndDialog(hDlg, 1);  // Завершение диалога с кодом успеха
             }
             else {
@@ -232,6 +303,7 @@ INT_PTR CALLBACK SelectFileDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARA
             return TRUE;
         }
         case IDCANCEL:  // Нажатие кнопки Отмена
+            g_selectedFilePath[0] = _T('\0'); // Очищаем выбор
             EndDialog(hDlg, 0);  // Завершение диалога с кодом отмены
             return TRUE;
         }
@@ -467,6 +539,73 @@ void DisplayFileContent(LPCTSTR filename) {
     CloseHandle(hFile);
 }
 
+// Диалоговая процедура для ввода параметров TestProc
+INT_PTR CALLBACK TestProcParamsDlgProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
+{
+    switch (message)
+    {
+    case WM_INITDIALOG:
+    {
+        // Устанавливаем текущие значения
+        SetDlgItemInt(hDlg, IDC_EDIT_X, g_testProcX, FALSE);
+        SetDlgItemInt(hDlg, IDC_EDIT_Y, g_testProcY, FALSE);
+        SetDlgItemInt(hDlg, IDC_EDIT_WIDTH, g_testProcWidth, FALSE);
+        SetDlgItemInt(hDlg, IDC_EDIT_HEIGHT, g_testProcHeight, FALSE);
+
+        // Заполняем комбобокс и выбираем текущий режим
+        HWND hCombo = GetDlgItem(hDlg, IDC_COMBO_STYLE);
+        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)TEXT("Обычное окно (SW_SHOWNORMAL)"));
+        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)TEXT("Развернутое (SW_SHOWMAXIMIZED)"));
+        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)TEXT("Свернутое (SW_SHOWMINIMIZED)"));
+        SendMessage(hCombo, CB_ADDSTRING, 0, (LPARAM)TEXT("Скрытое (SW_HIDE)"));
+
+        // Устанавливаем текущий выбор
+        int currentSelection = 0; // Объявляем внутри блока с фигурными скобками
+        switch (g_testProcShowCmd) {
+        case SW_SHOWMAXIMIZED: currentSelection = 1; break;
+        case SW_SHOWMINIMIZED: currentSelection = 2; break;
+        case SW_HIDE: currentSelection = 3; break;
+        }
+        SendMessage(hCombo, CB_SETCURSEL, currentSelection, 0);
+
+        return TRUE;
+    }
+
+    case WM_COMMAND:
+    {
+        if (LOWORD(wParam) == IDOK)
+        {
+            // Сохраняем новые значения
+            g_testProcX = GetDlgItemInt(hDlg, IDC_EDIT_X, NULL, FALSE);
+            g_testProcY = GetDlgItemInt(hDlg, IDC_EDIT_Y, NULL, FALSE);
+            g_testProcWidth = GetDlgItemInt(hDlg, IDC_EDIT_WIDTH, NULL, FALSE);
+            g_testProcHeight = GetDlgItemInt(hDlg, IDC_EDIT_HEIGHT, NULL, FALSE);
+
+            // Получаем режим отображения
+            HWND hCombo = GetDlgItem(hDlg, IDC_COMBO_STYLE);
+            int sel = SendMessage(hCombo, CB_GETCURSEL, 0, 0);
+            switch (sel) {
+            case 0: g_testProcShowCmd = SW_SHOWNORMAL; break;
+            case 1: g_testProcShowCmd = SW_SHOWMAXIMIZED; break;
+            case 2: g_testProcShowCmd = SW_SHOWMINIMIZED; break;
+            case 3: g_testProcShowCmd = SW_HIDE; break;
+            default: g_testProcShowCmd = SW_SHOWNORMAL;
+            }
+
+            EndDialog(hDlg, 1);
+            return TRUE;
+        }
+        else if (LOWORD(wParam) == IDCANCEL)
+        {
+            EndDialog(hDlg, 0);
+            return TRUE;
+        }
+        break;
+    }
+    }
+    return FALSE;
+}
+
 // ================= ПРОЦЕДУРА ГЛАВНОГО ОКНА =================
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
@@ -483,11 +622,9 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
         {
             // Отображение диалога выбора файла
             INT_PTR result = DialogBox(hInst, MAKEINTRESOURCE(IDD_SELECT_FILE), hWnd, SelectFileDlgProc);
-            if (result == 1) {
-                // Получение выбранного пути и обновление параметров
-                TCHAR filePath[MAX_PATH];
-                GetDlgItemText(GetActiveWindow(), IDC_FILE_PATH, filePath, MAX_PATH);
-                _tcscpy_s(CmdParam[2], _countof(CmdParam[2]), filePath);
+            if (result == 1 && _tcslen(g_selectedFilePath) > 0) {
+                // Используем сохраненный путь из глобальной переменной
+                _tcscpy_s(CmdParam[2], _countof(CmdParam[2]), g_selectedFilePath);
                 StartProcess(2);  // Запуск блокнота с выбранным файлом
             }
             break;
@@ -512,40 +649,55 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) 
             }
             break;
 
-        case IDM_PROCESS_TESTPROC:       // 5.2 - Запуск TestProc с настройками
+        case IDM_PROCESS_TESTPROC:
         {
-            // Настройка параметров окна через STARTUPINFO
-            STARTUPINFO si;
-            ZeroMemory(&si, sizeof(si));      // Обнуление структуры
-            si.cb = sizeof(si);               // Установление размера структуры
+            // Показываем диалог для ввода параметров
+            if (DialogBox(hInst, MAKEINTRESOURCE(IDD_TESTPROC_PARAMS), hWnd, TestProcParamsDlgProc))
+            {
+                // Запускаем с выбранными параметрами из глобальных переменных
+                if (StartTestProc(g_testProcX, g_testProcY, g_testProcWidth, g_testProcHeight, g_testProcShowCmd))
+                {
+                    // Показываем информацию о параметрах запуска
+                    TCHAR info[256];
+                    const TCHAR* modeText;
 
-            // Настройка параметров окна TestProc
-            si.dwFlags = STARTF_USEPOSITION | STARTF_USESIZE | STARTF_USESHOWWINDOW;
-            si.dwX = 100;                     // Позиция X на экране (в пикселях)
-            si.dwY = 100;                     // Позиция Y на экране (в пикселях)
-            si.dwXSize = 600;                 // Ширина окна (в пикселях)
-            si.dwYSize = 400;                 // Высота окна (в пикселях)
-            si.wShowWindow = SW_SHOWNORMAL;   // Режим отображения: нормальное окно
+                    switch (g_testProcShowCmd) {
+                    case SW_SHOWMAXIMIZED: modeText = TEXT("Развернутое"); break;
+                    case SW_SHOWMINIMIZED: modeText = TEXT("Свернутое"); break;
+                    case SW_HIDE: modeText = TEXT("Скрытое"); break;
+                    default: modeText = TEXT("Обычное окно");
+                    }
 
-            // Запуск TestProc с указанными параметрами окна
-            if (!StartProcessWithStartupInfo(4, &si)) {
-                MessageBox(hWnd, _T("Не удалось запустить TestProc"), _T("Ошибка"), MB_OK | MB_ICONERROR);
+                    _stprintf_s(info, _countof(info),
+                        TEXT("TestProc запущен с параметрами:\n")
+                        TEXT("Позиция: (%d, %d)\n")
+                        TEXT("Размер: %dx%d\n")
+                        TEXT("Режим: %s"),
+                        g_testProcX, g_testProcY,
+                        g_testProcWidth, g_testProcHeight,
+                        modeText);
+
+                    MessageBox(hWnd, info, TEXT("Запуск выполнен"), MB_OK | MB_ICONINFORMATION);
+                }
+                else
+                {
+                    MessageBox(hWnd,
+                        TEXT("Не удалось запустить TestProc"),
+                        TEXT("Ошибка"),
+                        MB_OK | MB_ICONERROR);
+                }
             }
             break;
         }
-
         case IDM_PROCESS_NOTEPAD_WAIT:   // 5.3 - Блокнот с ожиданием
         {
             // Отображение диалога выбора файла
             INT_PTR result = DialogBox(hInst, MAKEINTRESOURCE(IDD_SELECT_FILE), hWnd, SelectFileDlgProc);
-            if (result == 1) {
-                TCHAR filePath[MAX_PATH];
-                GetDlgItemText(GetActiveWindow(), IDC_FILE_PATH, filePath, MAX_PATH);
-
+            if (result == 1 && _tcslen(g_selectedFilePath) > 0) {
                 // Запуск блокнота с ожиданием завершения
-                if (RunNotepadAndWait(filePath)) {
+                if (RunNotepadAndWait(g_selectedFilePath)) {
                     // Вывод содержимого файла после закрытия блокнота
-                    DisplayFileContent(filePath);
+                    DisplayFileContent(g_selectedFilePath);
                 }
             }
             break;
