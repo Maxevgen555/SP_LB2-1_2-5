@@ -1,0 +1,103 @@
+#include "resource.h"
+#include <windows.h>
+
+IDR_MAINMENU MENU
+BEGIN
+    POPUP "&Файл"
+    BEGIN
+        MENUITEM "&О программе", IDM_ABOUT
+        MENUITEM "&Выход", IDM_EXIT
+    END
+    
+    POPUP "&Поток 1"
+    BEGIN
+        MENUITEM "&Создать поток", IDM_THREAD1_CREATE
+        MENUITEM "Создать &ждущий поток", IDM_THREAD1_CREATE_SUSPENDED
+        MENUITEM "&Приостановить поток", IDM_THREAD1_SUSPEND
+        MENUITEM "П&родолжить работу потока", IDM_THREAD1_RESUME
+        MENUITEM "&Уничтожить поток", IDM_THREAD1_TERMINATE
+        MENUITEM "&Увеличить приоритет", IDM_THREAD1_INCREASE_PRIORITY
+        MENUITEM "&Уменьшить приоритет", IDM_THREAD1_DECREASE_PRIORITY
+    END
+    
+    POPUP "Пото&к 2"
+    BEGIN
+        MENUITEM "Создать пото&к", IDM_THREAD2_CREATE
+        MENUITEM "Создать ждущи&й поток", IDM_THREAD2_CREATE_SUSPENDED
+        MENUITEM "Приостано&вить поток", IDM_THREAD2_SUSPEND
+        MENUITEM "Продолжить &работу потока", IDM_THREAD2_RESUME
+        MENUITEM "Уничтожить &поток", IDM_THREAD2_TERMINATE
+        MENUITEM "Увеличить при&оритет", IDM_THREAD2_INCREASE_PRIORITY
+        MENUITEM "Уменьшить приор&итет", IDM_THREAD2_DECREASE_PRIORITY
+    END
+    
+    POPUP "&Анимация"
+    BEGIN
+        MENUITEM "Создать поток &анимации", IDM_ANIMATION_CREATE
+        MENUITEM "Создать ждущий поток анимации", IDM_ANIMATION_CREATE_SUSPENDED
+        MENUITEM "Приостановить поток анимации", IDM_ANIMATION_SUSPEND
+        MENUITEM "Возобновить поток анимации", IDM_ANIMATION_RESUME
+        MENUITEM "Уничтожить поток анимации", IDM_ANIMATION_TERMINATE
+        MENUITEM "Увеличить приоритет анимации", IDM_ANIMATION_INCREASE_PRIORITY
+        MENUITEM "Уменьшить приоритет анимации", IDM_ANIMATION_DECREASE_PRIORITY
+    END
+    
+	POPUP "&Таймер"
+	BEGIN
+		MENUITEM "Создать ждущий таймер", IDM_TIMER_CREATE
+		MENUITEM "Запустить таймер", IDM_TIMER_START
+		MENUITEM "Остановить таймер", IDM_TIMER_STOP
+		MENUITEM "Информация о таймере", IDM_TIMER_INFO
+	END
+	
+    POPUP "&Информация"
+    BEGIN
+        MENUITEM "О первичном потоке", IDM_INFO_PRIMARY
+        MENUITEM "О потоке 1", IDM_INFO_THREAD1
+        MENUITEM "О потоке 2", IDM_INFO_THREAD2
+        MENUITEM "О потоке анимации", IDM_INFO_ANIMATION
+    END
+    
+    POPUP "&Синхронизация"
+    BEGIN
+        MENUITEM "Включить согласование", IDM_SYNC_ENABLE
+        MENUITEM "Выключить согласование", IDM_SYNC_DISABLE
+    END
+END
+
+IDD_ABOUT DIALOGEX 0, 0, 200, 100
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "О программе"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Приложение для демонстрации работы потоков",-1,10,10,180,20
+    LTEXT           "Синхронизация с использованием критической секции",-1,10,30,180,20
+    LTEXT           "Вариант К16: N = 4 * длина строки",-1,10,50,180,20
+    DEFPUSHBUTTON   "OK",IDOK,75,75,50,14
+END
+
+IDD_THREADINFO DIALOGEX 0, 0, 250, 180
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Информация о потоке"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Имя потока:",-1,10,15,60,8
+    LTEXT           "",IDC_THREAD_NAME,80,15,150,8
+
+    LTEXT           "ID потока:",-1,10,30,60,8
+    LTEXT           "",IDC_THREAD_ID,80,30,150,8
+
+    LTEXT           "Дескриптор:",-1,10,45,60,8
+    LTEXT           "",IDC_THREAD_HANDLE,80,45,150,8
+
+    LTEXT           "Состояние:",-1,10,60,60,8
+    LTEXT           "",IDC_THREAD_STATE,80,60,150,8
+
+    LTEXT           "Приоритет:",-1,10,75,60,8
+    LTEXT           "",IDC_THREAD_PRIORITY,80,75,150,8
+
+    LTEXT           "Время работы:",-1,10,90,60,8
+    LTEXT           "",IDC_THREAD_LIFETIME,80,90,150,8
+
+    DEFPUSHBUTTON   "OK",IDOK,100,150,50,14
+END
