@@ -180,10 +180,275 @@ https://github.com/Maxevgen555/SP_LB2-1_2-5
 
 Задание:
   	Изучить представленные в папке работы примеры многопоточных приложений и реализованные в них возможности синхронизации работы. Разработать собственные безопасные с точки зрения многопоточности приложения в соответствии с индивидуальными заданиями.
+Выполнение: 
+Получение практических навыков синхронизации потоков: 
+1. Используйте проект предыдущей лабораторной работы 2-2. 
+2. Добавьте PopUp меню “Синхронизация” с командами “Включить согласование”, “Выключить согласование”. 
+  POPUP "&Синхронизация"
+    BEGIN
+        MENUITEM "Включить согласование", IDM_SYNC_ENABLE
+        MENUITEM "Выключить согласование", IDM_SYNC_DISABLE
+    END
+3. Добавьте в приложение код обработки новых команд меню и средства синхронизации работы в соответствии с индивидуальным заданием 1. 
+void EnableSynchronization()
+{
+    g_synchronizationEnabled = TRUE;  // Установка флага синхронизации
 
+    // Принудительное обновление окна для отображения изменений
+    HWND hWnd = FindWindow(szClassName, NULL);
+    if (hWnd) InvalidateRect(hWnd, NULL, TRUE);
 
+    // Информационное сообщение пользователю
+    MessageBox(NULL, _T("Синхронизация включена\nКаждый поток будет выполнять N шагов атомарно"),
+        _T("Синхронизация"), MB_OK | MB_ICONINFORMATION);
+}
 
+// Выключение синхронизации потоков
+void DisableSynchronization()
+{
+    g_synchronizationEnabled = FALSE;  // Сброс флага синхронизации
 
+    // Принудительное обновление окна
+    HWND hWnd = FindWindow(szClassName, NULL);
+    if (hWnd) InvalidateRect(hWnd, NULL, TRUE);
+
+    // Информационное сообщение пользователю
+    MessageBox(NULL, _T("Синхронизация выключена\nПотоки работают параллельно"),
+        _T("Синхронизация"), MB_OK | MB_ICONINFORMATION);
+}
+… 
+            // Команды синхронизации
+        case IDM_SYNC_ENABLE:  // Включить синхронизацию
+            EnableSynchronization();
+            break;
+        case IDM_SYNC_DISABLE:  // Выключить синхронизацию
+            DisableSynchronization();
+            break;
+…
+TCHAR syncInfo[256];
+ if (g_synchronizationEnabled)  // Если синхронизация включена
+ {
+     SetTextColor(hdc, RGB(0, 128, 0));  // Зеленый текст
+     _stprintf(syncInfo, _T("✓ СИНХРОНИЗАЦИЯ ВКЛЮЧЕНА (Режим К16: N = %d шагов)"),
+         4 * _tcslen(g_thread1Text));
+ }
+ else  // Если синхронизация выключена
+ {
+     SetTextColor(hdc, RGB(200, 0, 0));  // Красный текст
+     _tcscpy(syncInfo, _T("✗ СИНХРОНИЗАЦИЯ ВЫКЛЮЧЕНА (Параллельный режим)"));
+ }
+ TextOut(hdc, 20, 155, syncInfo, _tcslen(syncInfo));
+
+ // ОТОБРАЖЕНИЕ СЧЕТЧИКОВ ШАГОВ ПОТОКОВ
+ SetTextColor(hdc, RGB(0, 0, 128));  // Темно-синий текст
+ TCHAR counterInfo[256];
+ _stprintf(counterInfo, _T("Поток 1: %d шагов  |  Поток 2: %d шагов  |  Всего: %d шагов"),
+     g_stepCounter[1], g_stepCounter[2], g_stepCounter[1] + g_stepCounter[2]);
+ TextOut(hdc, 20, 175, counterInfo, _tcslen(counterInfo));
+
+ // ОТОБРАЖЕНИЕ СТАТУСОВ ПОТОКОВ
+ SetTextColor(hdc, RGB(80, 80, 80));  // Серый текст
+ TCHAR statusInfo[256];
+ _stprintf(statusInfo, _T("Статус: Поток1-%s | Поток2-%s | Анимация-%s"),
+     hSecThread[1] ? (threadStates[1] == 1 ? _T("Активен") : _T("Приостановлен")) : _T("Не создан"),
+     hSecThread[2] ? (threadStates[2] == 1 ? _T("Активен") : _T("Приостановлен")) : _T("Не создан"),
+     hAnimationThread ? (animationState == 1 ? _T("Активна") : _T("Приостановлена")) : _T("Не создана"));
+ TextOut(hdc, 20, 195, statusInfo, _tcslen(statusInfo));
+
+ // ВОССТАНОВЛЕНИЕ ИСХОДНОГО ШРИФТА И УДАЛЕНИЕ СОЗДАННОГО
+ SelectObject(hdc, hOldFont);
+ DeleteObject(hFont);
+
+ EndPaint(hWnd, &ps);  // Завершение перерисовки
+… 
+
+4. Выполните компиляцию, компоновку и отладку программы. 
+5. Выполните тестирование добавленных функций ( работа с синхронизацией и без).  
+ 
+При включении синхронизации потоки выполняются попеременно, заданный промежуток времени.
+6. Создайте и протестируйте приложение с применением для синхронизации объекта «ожидающий таймер» (WaitableTimer Object) в соответствии с индивидуальным заданием 2.  	
+POPUP "&Таймер"
+BEGIN
+    MENUITEM "Создать ждущий таймер", IDM_TIMER_CREATE
+    MENUITEM "Запустить таймер", IDM_TIMER_START
+    MENUITEM "Остановить таймер", IDM_TIMER_STOP
+    MENUITEM "Информация о таймере", IDM_TIMER_INFO
+END
+
+// Таймер
+#define IDM_TIMER_CREATE 1601
+#define IDM_TIMER_START 1602
+#define IDM_TIMER_STOP 1603
+#define IDM_TIMER_INFO 1604
+
+// ==================== ФУНКЦИИ ДЛЯ WAITABLE TIMER (ВАРИАНТ Т3) ====================
+
+// Создание ждущего таймера
+void CreateWaitableTimer()
+{
+    if (hWaitableTimer != NULL)
+    {
+        MessageBox(NULL, _T("Таймер уже создан!"), _T("Ошибка"), MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    // Создание ждущего таймера
+    hWaitableTimer = CreateWaitableTimer(NULL, FALSE, NULL);
+    if (hWaitableTimer)
+    {
+        MessageBox(NULL, _T("Ждущий таймер создан успешно!"), _T("Таймер"), MB_OK | MB_ICONINFORMATION);
+    }
+    else
+    {
+        MessageBox(NULL, _T("Ошибка создания таймера!"), _T("Ошибка"), MB_OK | MB_ICONERROR);
+    }
+}
+
+// Запуск таймера
+void StartWaitableTimer()
+{
+    if (hWaitableTimer == NULL)
+    {
+        MessageBox(NULL, _T("Сначала создайте таймер!"), _T("Ошибка"), MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    if (g_timerEnabled)
+    {
+        MessageBox(NULL, _T("Таймер уже запущен!"), _T("Ошибка"), MB_OK | MB_ICONWARNING);
+        return;
+    }
+
+    LARGE_INTEGER liDueTime;
+    const int nTimerUnitsPerSecond = 10000000; // 100-наносекундные интервалы в секунде
+
+    // Установка времени первого срабатывания: через 15 секунд
+    liDueTime.QuadPart = -(15 * nTimerUnitsPerSecond);
+
+    // Установка таймера: первый сигнал через 15 секунд, затем каждые 15 секунд
+    if (SetWaitableTimer(hWaitableTimer, &liDueTime, 15 * 1000, NULL, NULL, FALSE))
+    {
+        g_timerEnabled = TRUE;
+        g_timerCounter = 0;
+
+        // Создание потока для обработки таймера
+        HANDLE hTimerThread = CreateThread(NULL, 0, TimerThreadProc, NULL, 0, NULL);
+        if (hTimerThread)
+        {
+            CloseHandle(hTimerThread); // Закрываем дескриптор, так как он нам не нужен
+        }
+
+        MessageBox(NULL, _T("Таймер запущен!\nКаждые 15 секунд будет появляться MessageBox."), 
+                   _T("Таймер"), MB_OK | MB_ICONINFORMATION);
+    }
+    else
+    {
+        MessageBox(NULL, _T("Ошибка запуска таймера!"), _T("Ошибка"), MB_OK | MB_ICONERROR);
+    }
+}
+
+// Остановка таймера
+void StopWaitableTimer()
+{
+    if (hWaitableTimer && g_timerEnabled)
+    {
+        // Отмена таймера
+        CancelWaitableTimer(hWaitableTimer);
+        g_timerEnabled = FALSE;
+        MessageBox(NULL, _T("Таймер остановлен!"), _T("Таймер"), MB_OK | MB_ICONINFORMATION);
+    }
+    else
+    {
+        MessageBox(NULL, _T("Таймер не активен!"), _T("Ошибка"), MB_OK | MB_ICONWARNING);
+    }
+}
+
+// Функция потока для обработки таймера
+DWORD WINAPI TimerThreadProc(LPVOID lpParam)
+{
+    while (g_timerEnabled)
+    {
+        // Ожидание сигнала от таймера с таймаутом 15 секунд
+        DWORD dwResult = WaitForSingleObject(hWaitableTimer, 15000);
+
+        if (dwResult == WAIT_OBJECT_0) // Таймер сработал
+        {
+            // Таймер сработал - показываем MessageBox
+            ShowTimerMessageBox();
+        }
+        else if (dwResult == WAIT_TIMEOUT) // Таймаут 15 секунд
+        {
+            // Если ответ задерживается более 15 секунд - считаем это как RETRY
+            g_timerCounter++;
+            // Можно добавить логирование или другие действия
+        }
+        else if (dwResult == WAIT_ABANDONED) // Объект abandoned
+        {
+            break; // Выход из цикла
+        }
+
+        // Проверка флага на каждой итерации
+        if (!g_timerEnabled)
+            break;
+    }
+    return 0;
+}
+
+// Показать MessageBox с выбором действия
+void ShowTimerMessageBox()
+{
+    g_timerCounter++; // Увеличиваем счетчик вызовов
+
+    // Формирование текста сообщения
+    TCHAR message[256];
+    _stprintf(message, _T("Вызов номер %d\n\nПродолжить - RETRY\nЗавершить работу - ABORT"), g_timerCounter);
+
+    // Показ MessageBox с таймаутом 15 секунд
+    int result = MessageBox(NULL, message, _T("Ждущий таймер Т3"), 
+                           MB_ABORTRETRYIGNORE | MB_ICONQUESTION | MB_DEFBUTTON1);
+
+    // Обработка результата
+    switch (result)
+    {
+    case IDABORT: // Завершить работу
+        MessageBox(NULL, _T("Работа приложения завершается по запросу пользователя."), 
+                   _T("Завершение"), MB_OK | MB_ICONINFORMATION);
+        PostQuitMessage(0); // Завершение приложения
+        break;
+
+    case IDRETRY: // Продолжить
+    case IDIGNORE: // Игнорировать (тоже продолжаем)
+        // Просто продолжаем работу
+        break;
+
+    default:
+        // Любой другой случай (например, закрытие крестиком) - продолжаем
+        break;
+    }
+}
+ 
+Коды программ и краткое описание лабораторных работ на GitHub:
+https://github.com/Maxevgen555/SP_LB2-1_2-5
+При работе использовались ии-агенты https://chat.deepseek.com/  https://www.perplexity.ai/ и copilot (встроенный клиент VS2024, отдельно установленная программа).
+
+Вывод: 
+В ходе выполнения лабораторной работы я изучил возможности согласования работы взаимодействующих потоков с целью исключения гонок и обеспечения необходимой последовательности их выполнения, а так же используемые для этой цели системные средства, представленные в папке работы примеры многопоточных приложений и реализованные в них возможности синхронизации работы. Разработал собственные, безопасные с точки зрения многопоточности, приложения в соответствии с индивидуальными заданиями.
 
 Вывод: 
 В ходе выполнения лабораторной работы я изучил возможности управления потоками в Win32 API, приобрел практические навыки создания многопоточных приложений Windows.
+
+
+
+
+
+Лабораторная работа №2-4 
+Вариант №3
+Тема: 
+ Разработка и применение динамически загружаемых библиотек 
+в Win32 приложения
+
+Цели лабораторной работы:
+Изучить технологию создания и использования динамически загружаемых библиотек в WIN32 API.
+
+
+
